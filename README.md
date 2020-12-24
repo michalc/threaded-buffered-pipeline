@@ -1,6 +1,6 @@
-# asyncio-buffered-pipeline [![CircleCI](https://circleci.com/gh/michalc/asyncio-buffered-pipeline.svg?style=shield)](https://circleci.com/gh/michalc/asyncio-buffered-pipeline) [![Test Coverage](https://api.codeclimate.com/v1/badges/defb145849be2214e381/test_coverage)](https://codeclimate.com/github/michalc/asyncio-buffered-pipeline/test_coverage)
+# threaded-buffered-pipeline [![CircleCI](https://circleci.com/gh/michalc/threaded-buffered-pipeline.svg?style=shield)](https://circleci.com/gh/michalc/threaded-buffered-pipeline) [![Test Coverage](https://api.codeclimate.com/v1/badges/9b8b2d41ed7dc90ed57d/test_coverage)](https://codeclimate.com/github/michalc/threaded-buffered-pipeline/test_coverage)
 
-Parallelise pipelines of Python async iterables/generators.
+Parallelise pipelines of Python iterators.
 
 ## Installation
 
