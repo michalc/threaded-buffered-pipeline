@@ -7,22 +7,21 @@ def long_description():
 
 
 setuptools.setup(
-    name='asyncio-buffered-pipeline',
-    version='0.0.8',
+    name='threaded-buffered-pipeline',
+    version='0.0.0',
     author='Michal Charemza',
     author_email='michal@charemza.name',
-    description='Parallelize pipelines of Python async iterables/generators',
+    description='Parallelize pipelines of Python iterables',
     long_description=long_description(),
     long_description_content_type='text/markdown',
-    url='https://github.com/michalc/asyncio-buffered-pipeline',
+    url='https://github.com/michalc/threaded-buffered-pipeline',
     py_modules=[
-        'asyncio_buffered_pipeline',
+        'threaded_buffered_pipeline',
     ],
     python_requires='>=3.7.1',
     classifiers=[
         'Programming Language :: Python :: 3',
         'License :: OSI Approved :: MIT License',
         'Operating System :: OS Independent',
-        'Framework :: AsyncIO',
     ],
 )
