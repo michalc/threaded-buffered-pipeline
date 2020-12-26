@@ -62,10 +62,9 @@ def buffered_pipeline():
                 return self._stopped
 
     def _buffer_iterable(iterable, buffer_size=1):
-        nonlocal threads
-        iterator = iter(iterable)
 
         def _iterate():
+            iterator = iter(iterable)
             thread = threading.current_thread()
             try:
                 while True:
@@ -99,7 +98,7 @@ def buffered_pipeline():
             # Stop threads earlier in the pipeline, which are actually created later, since they
             # are created when "pulling" from earlier iterables. The later threads are stopped
             # by the propagation of exceptions
-            for thread in threads[index:]:
+            for thread in threads[index + 1:]:
                 thread.queue_stop()
                 thread.join()
             raise
