@@ -80,7 +80,7 @@ class TestBufferIterable(TestCase):
         num_done = []
         for _ in it_3:
             # Slight hack to wait for buffers to be full
-            time.sleep(0.02)
+            time.sleep(0.1)
             num_done.append((num_gen_1, num_gen_2, num_gen_3))
 
         self.assertEqual(num_done, [
@@ -109,7 +109,7 @@ class TestBufferIterable(TestCase):
         num_threads = []
         for _ in it_3:
             # Slight hack to wait for buffers to be full
-            time.sleep(0.02)
+            time.sleep(0.1)
             num_threads.append(threading.active_count())
 
         self.assertEqual(num_threads, [4, 4, 4, 4, 4, 4, 4, 3, 2, 1])
@@ -163,7 +163,7 @@ class TestBufferIterable(TestCase):
         buffer_iterable = buffered_pipeline()
         for _ in buffer_iterable(gen_1()):
             # Slight hack to wait for buffers to be full
-            time.sleep(0.02)
+            time.sleep(0.1)
             num_gens.append(num_gen)
 
         self.assertEqual(num_gens, [2, 3, 4, 5, 6, 7, 8, 9, 10, 10])
@@ -184,7 +184,7 @@ class TestBufferIterable(TestCase):
         buffer_iterable = buffered_pipeline()
         for _ in buffer_iterable(gen_1(), buffer_size=2):
             # Slight hack to wait for buffers to be full
-            time.sleep(0.02)
+            time.sleep(0.1)
             num_gens.append(num_gen)
 
         self.assertEqual(num_gens, [3, 4, 5, 6, 7, 8, 9, 10, 10, 10])
