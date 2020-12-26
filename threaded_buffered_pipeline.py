@@ -1,87 +1,111 @@
-import asyncio
 import collections
+import threading
+
 
 def buffered_pipeline():
-    tasks = []
+    threads = []
 
-    def queue(size):
-        # The regular asyncio.queue doesn't have a function to wait for space
-        # in the queue without also immediately putting an item into it, which
-        # would mean effective minimum buffer_size is 2: an item in the queue
-        # and in memory waiting to put into it. To allow a buffer_size of 1,
-        # we need to check there is space _before_ fetching the item from
-        # upstream. This requires a custom queue implementation.
-        # 
-        # We also can guarantee there will be at most one getter and putter at
-        # any one time, and that _put won't be called until there is space in
-        # the queue, so we can have much simpler code than asyncio.Queue
+    # The regular queue.Queue doesn't have a function to wait for space in the queue without also
+    # immediately putting an item into it, which would mean effective minimum buffer_size is 2: an
+    # item in the queue and in memory waiting to put into it. To allow a buffer_size of 1, we need
+    # to check there is space _before_ fetching the item from upstream. This seems to require a
+    # custom queue implementation.
+    #
+    # We also can guarantee there will be at most one getter and putter at any one time, and that
+    # _put won't be called until there is space in the queue, so we can have much simpler code than
+    # Queue
+    class ThreadWithQueue(threading.Thread):
+        def __init__(self, *args, buffer_size, **kwargs):
+            super().__init__(*args, **kwargs)
+            self._buffer_size = buffer_size
 
-        _queue = collections.deque()
-        at_least_one_in_queue = asyncio.Event()
-        until_space = asyncio.Event()
-        until_space.set()
+            self._queue = collections.deque()
 
-        async def _space():
-            await until_space.wait()
+            self._queue_lock = threading.Lock()
+            self._has_items_or_stopped = threading.Event()
+            self._has_space_or_stopped = threading.Event()
+            self._has_space_or_stopped.set()
 
-        def _has_items():
-            return bool(_queue)
+            self._stopped = False
 
-        async def _get():
-            nonlocal at_least_one_in_queue
-            await at_least_one_in_queue.wait()
-            value = _queue.popleft()
-            until_space.set()
-            if not _queue:
-                at_least_one_in_queue = asyncio.Event()
-            return value
+        def queue_wait_until_space_or_stopped(self):
+            self._has_space_or_stopped.wait()
 
-        def _put(item):
-            nonlocal until_space
-            _queue.append(item)
-            at_least_one_in_queue.set()
-            if len(_queue) >= size:
-                until_space = asyncio.Event()
+        def queue_wait_until_has_items_or_stopped(self):
+            self._has_items_or_stopped.wait()
 
-        return _space, _has_items, _get, _put
+        def queue_get(self):
+            with self._queue_lock:
+                value = self._queue.popleft()
+                self._has_space_or_stopped.set()
+                if not self._queue and not self._stopped:
+                    # Only the same thread that calls queue_get waits on this event
+                    self._has_items_or_stopped = threading.Event()
+                return value
 
-    async def _buffer_iterable(iterable, buffer_size=1):
-        nonlocal tasks
-        queue_space, queue_has_items, queue_get, queue_put = queue(buffer_size)
-        iterator = iterable.__aiter__()
+        def queue_put(self, item):
+            with self._queue_lock:
+                self._queue.append(item)
+                self._has_items_or_stopped.set()
+                if len(self._queue) >= self._buffer_size and not self._stopped:
+                    # Only the same thread that calls queue_put waits on this event
+                    self._has_space_or_stopped = threading.Event()
 
-        async def _iterate():
+        def queue_stop(self):
+            with self._queue_lock:
+                self._stopped = True
+                self._has_items_or_stopped.set()
+                self._has_space_or_stopped.set()
+
+        def queue_has_items(self):
+            with self._queue_lock:
+                return bool(self._queue)
+
+        def queue_stopped(self):
+            with self._queue_lock:
+                return self._stopped
+
+    def _buffer_iterable(iterable, buffer_size=1):
+        nonlocal threads
+        iterator = iter(iterable)
+
+        def _iterate():
+            thread = threading.current_thread()
             try:
                 while True:
-                    await queue_space()
-                    value = await iterator.__anext__()
-                    queue_put((None, value))
+                    thread.queue_wait_until_space_or_stopped()
+                    if thread.queue_stopped():
+                        break
+                    value = next(iterator)
+                    thread.queue_put((None, value))
                     value = None  # So value can be garbage collected
-            except BaseException as exception:
-                queue_put((exception, None))
+            except Exception as exception:
+                thread.queue_put((exception, None))
 
-        task = asyncio.create_task(_iterate())
-        tasks.append(task)
+        thread = ThreadWithQueue(target=_iterate, buffer_size=buffer_size)
+        thread.start()
+        index = len(threads)
+        threads.append(thread)
 
         try:
-            while queue_has_items() or task:
-                exception, value = await queue_get()
+            while True:
+                thread.queue_wait_until_has_items_or_stopped()
+                if thread.queue_stopped():
+                    break
+                exception, value = thread.queue_get()
                 if exception is not None:
                     raise exception from None
                 yield value
                 value = None  # So value can be garbage collected
-        except StopAsyncIteration:
+        except StopIteration:
             pass
-        except BaseException as exception:
-            for task in tasks:
-                task.cancel()
-            all_tasks = tasks
-            tasks = []
-            for task in all_tasks:
-                try:
-                    await task
-                except asyncio.CancelledError:
-                    pass
+        except Exception as exception:
+            # Stop threads earlier in the pipeline, which are actually created later, since they
+            # are created when "pulling" from earlier iterables. The later threads are stopped
+            # by the propagation of exceptions
+            for thread in threads[index:]:
+                thread.queue_stop()
+                thread.join()
             raise
 
     return _buffer_iterable

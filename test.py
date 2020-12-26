@@ -1,4 +1,5 @@
-import asyncio
+import threading
+import time
 from unittest import (
     TestCase,
 )
@@ -6,28 +7,19 @@ from unittest import (
 from threaded_buffered_pipeline import buffered_pipeline
 
 
-def async_test(func):
-    def wrapper(*args, **kwargs):
-        future = func(*args, **kwargs)
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(future)
-    return wrapper
-
-
 class TestBufferIterable(TestCase):
 
-    @async_test
-    async def test_chain_all_buffered(self):
-        async def gen_1():
+    def test_chain_all_buffered(self):
+        def gen_1():
             for value in range(0, 10):
                 yield value
 
-        async def gen_2(it):
-            async for value in it:
+        def gen_2(it):
+            for value in it:
                 yield value * 2
 
-        async def gen_3(it):
-            async for value in it:
+        def gen_3(it):
+            for value in it:
                 yield value + 3
 
         buffer_iterable = buffered_pipeline()
@@ -35,21 +27,19 @@ class TestBufferIterable(TestCase):
         it_2 = buffer_iterable(gen_2(it_1))
         it_3 = buffer_iterable(gen_3(it_2))
 
-        values = [value async for value in it_3]
-        self.assertEqual(values, [3, 5, 7, 9, 11, 13, 15, 17, 19, 21])
+        self.assertEqual(list(it_3), [3, 5, 7, 9, 11, 13, 15, 17, 19, 21])
 
-    @async_test
-    async def test_chain_some_buffered(self):
-        async def gen_1():
+    def test_chain_some_buffered(self):
+        def gen_1():
             for value in range(0, 10):
                 yield value
 
-        async def gen_2(it):
-            async for value in it:
+        def gen_2(it):
+            for value in it:
                 yield value * 2
 
-        async def gen_3(it):
-            async for value in it:
+        def gen_3(it):
+            for value in it:
                 yield value + 3
 
         buffer_iterable = buffered_pipeline()
@@ -57,30 +47,28 @@ class TestBufferIterable(TestCase):
         it_2 = gen_2(it_1)
         it_3 = buffer_iterable(gen_3(it_2))
 
-        values = [value async for value in it_3]
-        self.assertEqual(values, [3, 5, 7, 9, 11, 13, 15, 17, 19, 21])
+        self.assertEqual(list(it_3), [3, 5, 7, 9, 11, 13, 15, 17, 19, 21])
 
-    @async_test
-    async def test_chain_parallel(self):
+    def test_chain_parallel(self):
         num_gen_1 = 0
         num_gen_2 = 0
         num_gen_3 = 0
 
-        async def gen_1():
+        def gen_1():
             nonlocal num_gen_1
             for value in range(0, 10):
                 num_gen_1 += 1
                 yield
 
-        async def gen_2(it):
+        def gen_2(it):
             nonlocal num_gen_2
-            async for value in it:
+            for value in it:
                 num_gen_2 += 1
                 yield
 
-        async def gen_3(it):
+        def gen_3(it):
             nonlocal num_gen_3
-            async for value in it:
+            for value in it:
                 num_gen_3 += 1
                 yield
 
@@ -90,9 +78,9 @@ class TestBufferIterable(TestCase):
         it_3 = buffer_iterable(gen_3(it_2))
 
         num_done = []
-        async for _ in it_3:
+        for _ in it_3:
             # Slight hack to wait for buffers to be full
-            await asyncio.sleep(0.02)
+            time.sleep(0.02)
             num_done.append((num_gen_1, num_gen_2, num_gen_3))
 
         self.assertEqual(num_done, [
@@ -100,18 +88,17 @@ class TestBufferIterable(TestCase):
             (9, 8, 7), (10, 9, 8), (10, 10, 9), (10, 10, 10), (10, 10, 10),
         ])
 
-    @async_test
-    async def test_num_tasks(self):
-        async def gen_1():
+    def test_num_threads(self):
+        def gen_1():
             for value in range(0, 10):
                 yield
 
-        async def gen_2(it):
-            async for value in it:
+        def gen_2(it):
+            for value in it:
                 yield
 
-        async def gen_3(it):
-            async for value in it:
+        def gen_3(it):
+            for value in it:
                 yield
 
         buffer_iterable = buffered_pipeline()
@@ -119,34 +106,33 @@ class TestBufferIterable(TestCase):
         it_2 = buffer_iterable(gen_2(it_1))
         it_3 = buffer_iterable(gen_3(it_2))
 
-        num_tasks = []
-        async for _ in it_3:
+        num_threads = []
+        for _ in it_3:
             # Slight hack to wait for buffers to be full
-            await asyncio.sleep(0.02)
-            num_tasks.append(len(asyncio.all_tasks()))
+            time.sleep(0.02)
+            num_threads.append(threading.active_count())
 
-        self.assertEqual(num_tasks, [4, 4, 4, 4, 4, 4, 4, 3, 2, 1])
+        self.assertEqual(num_threads, [4, 4, 4, 4, 4, 4, 4, 3, 2, 1])
 
-    @async_test
-    async def test_exception_propagates(self):
+    def test_exception_propagates(self):
         class MyException(Exception):
             pass
 
-        async def gen_1():
+        def gen_1():
             for value in range(0, 10):
                 yield
 
-        async def gen_2(it):
-            async for value in it:
+        def gen_2(it):
+            for value in it:
                 yield
 
-        async def gen_3(it):
-            async for value in it:
+        def gen_3(it):
+            for value in it:
                 yield
                 raise MyException()
 
-        async def gen_4(it):
-            async for value in it:
+        def gen_4(it):
+            for value in it:
                 yield
 
         buffer_iterable = buffered_pipeline()
@@ -156,54 +142,12 @@ class TestBufferIterable(TestCase):
         it_4 = buffer_iterable(gen_4(it_3))
 
         with self.assertRaises(MyException):
-            async for _ in it_4:
+            for _ in it_4:
                 pass
 
-        self.assertEqual(1, len(asyncio.all_tasks()))
+        self.assertEqual(1, threading.active_count())
 
-    @async_test
-    async def test_cancellation_propagates(self):
-        event = asyncio.Event()
-
-        async def gen_1():
-            for value in range(0, 10):
-                yield
-
-        async def gen_2(it):
-            async for value in it:
-                yield
-
-        async def gen_3(it):
-            async for value in it:
-                yield
-                event.set()
-                await asyncio.Future()
-
-        async def gen_4(it):
-            async for value in it:
-                yield
-
-        async def pipeline():
-            buffer_iterable = buffered_pipeline()
-            it_1 = buffer_iterable(gen_1())
-            it_2 = buffer_iterable(gen_2(it_1))
-            it_3 = buffer_iterable(gen_3(it_2))
-            it_4 = buffer_iterable(gen_4(it_3))
-            [value async for value in it_4]
-
-        task = asyncio.create_task(pipeline())
-        await event.wait()
-        task.cancel()
-        try:
-            await task
-        except asyncio.CancelledError:
-            pass
-
-        await asyncio.sleep(0)
-        self.assertEqual(1, len(asyncio.all_tasks()))
-
-    @async_test
-    async def test_default_bufsize(self):
+    def test_default_bufsize(self):
         num_gen = 0
 
         def get_value():
@@ -211,21 +155,20 @@ class TestBufferIterable(TestCase):
             num_gen += 1
             return 1
 
-        async def gen_1():
+        def gen_1():
             for _ in range(0, 10):
                 yield get_value()
 
         num_gens = []
         buffer_iterable = buffered_pipeline()
-        async for _ in buffer_iterable(gen_1()):
+        for _ in buffer_iterable(gen_1()):
             # Slight hack to wait for buffers to be full
-            await asyncio.sleep(0.02)
+            time.sleep(0.02)
             num_gens.append(num_gen)
 
         self.assertEqual(num_gens, [2, 3, 4, 5, 6, 7, 8, 9, 10, 10])
 
-    @async_test
-    async def test_bigger_bufsize(self):
+    def test_bigger_bufsize(self):
         num_gen = 0
 
         def get_value():
@@ -233,15 +176,15 @@ class TestBufferIterable(TestCase):
             num_gen += 1
             return 1
 
-        async def gen_1():
+        def gen_1():
             for _ in range(0, 10):
                 yield get_value()
 
         num_gens = []
         buffer_iterable = buffered_pipeline()
-        async for _ in buffer_iterable(gen_1(), buffer_size=2):
+        for _ in buffer_iterable(gen_1(), buffer_size=2):
             # Slight hack to wait for buffers to be full
-            await asyncio.sleep(0.02)
+            time.sleep(0.02)
             num_gens.append(num_gen)
 
         self.assertEqual(num_gens, [3, 4, 5, 6, 7, 8, 9, 10, 10, 10])
