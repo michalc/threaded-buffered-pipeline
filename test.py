@@ -115,11 +115,16 @@ class TestBufferIterable(TestCase):
         self.assertEqual(num_threads, [4, 4, 4, 4, 4, 4, 4, 3, 2, 1])
 
     def test_exception_propagates(self):
+        num_gen = 0
+
         class MyException(Exception):
             pass
 
         def gen_1():
+            nonlocal num_gen
+
             for value in range(0, 10):
+                num_gen += 1
                 yield
 
         def gen_2(it):
@@ -146,6 +151,7 @@ class TestBufferIterable(TestCase):
                 pass
 
         self.assertEqual(1, threading.active_count())
+        self.assertEqual(num_gen, 3)
 
     def test_default_bufsize(self):
         num_gen = 0
