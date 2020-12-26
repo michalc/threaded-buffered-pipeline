@@ -100,7 +100,8 @@ def buffered_pipeline():
             # by the propagation of exceptions
             for thread in threads[index + 1:]:
                 thread.queue_stop()
-                thread.join()
             raise
+        finally:
+            thread.join()
 
     return _buffer_iterable

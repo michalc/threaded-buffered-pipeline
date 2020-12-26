@@ -190,7 +190,7 @@ class TestBufferIterable(TestCase):
                 pass
 
         self.assertEqual(1, threading.active_count())
-        self.assertEqual(num_gen, 3)
+        self.assertEqual(num_gen, 2)
 
     def test_exception_propagates_before_first_iter(self):
         num_gen = 0
