@@ -57,10 +57,6 @@ def buffered_pipeline():
                 self._has_items_or_stopped.set()
                 self._has_space_or_stopped.set()
 
-        def queue_has_items(self):
-            with self._queue_lock:
-                return bool(self._queue)
-
         def queue_stopped(self):
             with self._queue_lock:
                 return self._stopped
