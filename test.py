@@ -114,7 +114,7 @@ class TestBufferIterable(TestCase):
 
         self.assertEqual(num_threads, [4, 4, 4, 4, 4, 4, 4, 3, 2, 1])
 
-    def test_exception_propagates(self):
+    def test_exception_propagates_after_first_yield(self):
         num_gen = 0
 
         class MyException(Exception):
@@ -152,6 +152,83 @@ class TestBufferIterable(TestCase):
 
         self.assertEqual(1, threading.active_count())
         self.assertEqual(num_gen, 3)
+
+    def test_exception_propagates_before_first_yield(self):
+        num_gen = 0
+
+        class MyException(Exception):
+            pass
+
+        def gen_1():
+            nonlocal num_gen
+
+            for value in range(0, 10):
+                num_gen += 1
+                yield
+
+        def gen_2(it):
+            for value in it:
+                yield
+
+        def gen_3(it):
+            for value in it:
+                raise MyException()
+                yield
+
+        def gen_4(it):
+            for value in it:
+                yield
+
+        buffer_iterable = buffered_pipeline()
+        it_1 = buffer_iterable(gen_1())
+        it_2 = buffer_iterable(gen_2(it_1))
+        it_3 = buffer_iterable(gen_3(it_2))
+        it_4 = buffer_iterable(gen_4(it_3))
+
+        with self.assertRaises(MyException):
+            for _ in it_4:
+                pass
+
+        self.assertEqual(1, threading.active_count())
+        self.assertEqual(num_gen, 3)
+
+    def test_exception_propagates_before_first_iter(self):
+        num_gen = 0
+
+        class MyException(Exception):
+            pass
+
+        def gen_1():
+            nonlocal num_gen
+
+            for value in range(0, 10):
+                num_gen += 1
+                yield
+
+        def gen_2(it):
+            for value in it:
+                yield
+
+        def gen_3(it):
+            raise MyException()
+            yield
+
+        def gen_4(it):
+            for value in it:
+                yield
+
+        buffer_iterable = buffered_pipeline()
+        it_1 = buffer_iterable(gen_1())
+        it_2 = buffer_iterable(gen_2(it_1))
+        it_3 = buffer_iterable(gen_3(it_2))
+        it_4 = buffer_iterable(gen_4(it_3))
+
+        with self.assertRaises(MyException):
+            for _ in it_4:
+                pass
+
+        self.assertEqual(1, threading.active_count())
+        self.assertEqual(num_gen, 0)
 
     def test_default_bufsize(self):
         num_gen = 0
