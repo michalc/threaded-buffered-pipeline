@@ -44,6 +44,7 @@ main()
 The `buffered_pipeline` function allows you to make to a small change, passing each generator through its return value, to parallelise the generators to reduce this to (just over) 12 seconds.
 
 ```python
+import time
 from threaded_buffered_pipeline import buffered_pipeline
 
 def gen_1():
