@@ -102,6 +102,8 @@ def buffered_pipeline():
                 thread.queue_stop()
             raise
         finally:
-            thread.join()
+            if index == 0:
+                for thread in threads:
+                    thread.join()
 
     return _buffer_iterable
