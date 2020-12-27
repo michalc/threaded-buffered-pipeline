@@ -210,6 +210,7 @@ class TestBufferIterable(TestCase):
                 yield
 
         def gen_3(it):
+            time.sleep(0.1)  # Slight hack to make sure previous buffers are full
             raise MyException()
             yield
 
@@ -228,7 +229,7 @@ class TestBufferIterable(TestCase):
                 pass
 
         self.assertEqual(1, threading.active_count())
-        self.assertEqual(num_gen, 0)
+        self.assertEqual(num_gen, 2)
 
     def test_exception_propagates_slow_previous_iterable(self):
         num_gen = 0
@@ -253,6 +254,7 @@ class TestBufferIterable(TestCase):
         def gen_3(it):
             for value in it:
                 if value == 2:
+                    time.sleep(0.1)  # Slight hack to make sure previous buffers are full
                     raise MyException()
                 yield value
 
@@ -293,6 +295,24 @@ class TestBufferIterable(TestCase):
             num_gens.append(num_gen)
 
         self.assertEqual(num_gens, [2, 3, 4, 5, 6, 7, 8, 9, 10, 10])
+
+    def test_iteration_starts_immediately(self):
+        num_gen = 0
+
+        def gen_1():
+            nonlocal num_gen
+            for i in range(0, 10):
+                num_gen += 1
+                yield i
+
+        buffer_iterable = buffered_pipeline()
+        it_1 = buffer_iterable(gen_1())
+
+        time.sleep(0.1)  # Slight hack to wait for iteration
+        self.assertEqual(num_gen, 1)
+
+        for _ in it_1:
+            pass
 
     def test_bigger_bufsize(self):
         num_gen = 0

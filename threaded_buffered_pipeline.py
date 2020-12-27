@@ -62,8 +62,7 @@ def buffered_pipeline():
                 return self._stopped
 
     def _buffer_iterable(iterable, buffer_size=1):
-
-        def _iterate():
+        def _iterate_upstream():
             iterator = iter(iterable)
             thread = threading.current_thread()
             try:
@@ -77,33 +76,35 @@ def buffered_pipeline():
             except Exception as exception:
                 thread.queue_put((exception, None))
 
-        thread = ThreadWithQueue(target=_iterate, buffer_size=buffer_size)
+        def _iterate_downstream(thread, index):
+            try:
+                while True:
+                    thread.queue_wait_until_has_items_or_stopped()
+                    if thread.queue_stopped():
+                        break
+                    exception, value = thread.queue_get()
+                    if exception is not None:
+                        raise exception from None
+                    yield value
+                    value = None  # So value can be garbage collected
+            except StopIteration:
+                pass
+            except Exception as exception:
+                # Stop threads earlier in the pipeline. The later threads are stopped by the
+                # propagation of exceptions
+                for thread in threads[:index]:
+                    thread.queue_stop()
+                raise
+            finally:
+                if index == len(threads) - 1:
+                    for thread in threads[:-1]:
+                        thread.join()
+
+        thread = ThreadWithQueue(target=_iterate_upstream, buffer_size=buffer_size)
         thread.start()
         index = len(threads)
         threads.append(thread)
 
-        try:
-            while True:
-                thread.queue_wait_until_has_items_or_stopped()
-                if thread.queue_stopped():
-                    break
-                exception, value = thread.queue_get()
-                if exception is not None:
-                    raise exception from None
-                yield value
-                value = None  # So value can be garbage collected
-        except StopIteration:
-            pass
-        except Exception as exception:
-            # Stop threads earlier in the pipeline, which are actually created later, since they
-            # are created when "pulling" from earlier iterables. The later threads are stopped
-            # by the propagation of exceptions
-            for thread in threads[index + 1:]:
-                thread.queue_stop()
-            raise
-        finally:
-            if index == 0:
-                for thread in threads:
-                    thread.join()
+        return _iterate_downstream(thread, index)
 
     return _buffer_iterable
