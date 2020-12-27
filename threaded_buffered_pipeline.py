@@ -65,16 +65,19 @@ def buffered_pipeline():
         def _iterate_upstream():
             iterator = iter(iterable)
             thread = threading.current_thread()
-            try:
-                while True:
-                    thread.queue_wait_until_space_or_stopped()
-                    if thread.queue_stopped():
-                        break
+
+            while True:
+                thread.queue_wait_until_space_or_stopped()
+                if thread.queue_stopped():
+                    break
+                try:
                     value = next(iterator)
-                    thread.queue_put((None, value))
-                    value = None  # So value can be garbage collected
-            except Exception as exception:
-                thread.queue_put((exception, None))
+                except Exception as exception:
+                    thread.queue_put((exception, None))
+                    break
+
+                thread.queue_put((None, value))
+                value = None  # So value can be garbage collected
 
         def _iterate_downstream(thread, index):
             try:
