@@ -230,6 +230,49 @@ class TestBufferIterable(TestCase):
         self.assertEqual(1, threading.active_count())
         self.assertEqual(num_gen, 0)
 
+    def test_exception_propagates_slow_previous_iterable(self):
+        num_gen = 0
+
+        class MyException(Exception):
+            pass
+
+        def gen_1():
+            nonlocal num_gen
+
+            for value in range(0, 10):
+                num_gen += 1
+                yield value
+                if value == 2:
+                    time.sleep(2)
+
+        def gen_2(it):
+            for value in it:
+                time.sleep(1)
+                yield value
+
+        def gen_3(it):
+            for value in it:
+                if value == 2:
+                    raise MyException()
+                yield value
+
+        def gen_4(it):
+            for value in it:
+                yield value
+
+        buffer_iterable = buffered_pipeline()
+        it_1 = buffer_iterable(gen_1())
+        it_2 = buffer_iterable(gen_2(it_1))
+        it_3 = buffer_iterable(gen_3(it_2))
+        it_4 = buffer_iterable(gen_4(it_3))
+
+        with self.assertRaises(MyException):
+            for _ in it_4:
+                pass
+
+        self.assertEqual(1, threading.active_count())
+        self.assertEqual(num_gen, 4)
+
     def test_default_bufsize(self):
         num_gen = 0
 
