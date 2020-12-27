@@ -1,6 +1,6 @@
 # threaded-buffered-pipeline [![CircleCI](https://circleci.com/gh/michalc/threaded-buffered-pipeline.svg?style=shield)](https://circleci.com/gh/michalc/threaded-buffered-pipeline) [![Test Coverage](https://api.codeclimate.com/v1/badges/9b8b2d41ed7dc90ed57d/test_coverage)](https://codeclimate.com/github/michalc/threaded-buffered-pipeline/test_coverage)
 
-Parallelise pipelines of Python iterators.
+Parallelise pipelines of Python iterables.
 
 ## Installation
 
