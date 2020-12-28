@@ -1,6 +1,6 @@
 # threaded-buffered-pipeline [![CircleCI](https://circleci.com/gh/michalc/threaded-buffered-pipeline.svg?style=shield)](https://circleci.com/gh/michalc/threaded-buffered-pipeline) [![Test Coverage](https://api.codeclimate.com/v1/badges/9b8b2d41ed7dc90ed57d/test_coverage)](https://codeclimate.com/github/michalc/threaded-buffered-pipeline/test_coverage)
 
-Parallelise pipelines of Python iterables.
+Parallelise pipelines of Python iterables
 
 ## Installation
 
@@ -96,3 +96,7 @@ it = buffer_iterable(gen(), buffer_size=2)
 - The buffer size of each step in the pipeline is configurable.
 
 - The "chaining" is not abstracted away. You still have full control over the arguments passed to each step, and you don't need to buffer each iterable in the pipeline if you don't want to: just don't pass those through `buffer_iterable`.
+
+## Asyncio
+
+A version for async iterables is available at https://github.com/michalc/asyncio-buffered-pipeline
